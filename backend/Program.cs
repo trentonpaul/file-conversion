@@ -7,6 +7,9 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<IImageConverter, MagickImageConverter>();
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -16,5 +19,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+app.UseExceptionHandler();
 
 app.Run();

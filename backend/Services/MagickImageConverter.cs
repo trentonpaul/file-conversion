@@ -4,9 +4,9 @@ namespace file_conversion_api.Services
 {
     public class MagickImageConverter : IImageConverter
     {
-        public async Task<Stream> ConvertAsync(Stream input, string from, string to)
+        public async Task<Stream> ConvertAsync(Stream input, string to)
         {
-            Console.WriteLine($"Converting image from {from} to {to} using Magick.NET");
+            Console.WriteLine($"Converting image to {to} using Magick.NET");
 
             if (!input.CanSeek)
             {

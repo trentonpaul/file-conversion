@@ -19,25 +19,39 @@ namespace file_conversion_api.Controllers
         }
 
         [HttpPost]
-        [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Post([FromQuery] string from, [FromQuery] string to, IFormFile file)
+        public async Task<IActionResult> Convert(
+            [FromQuery] string to)
         {
-            if (file == null || file.Length == 0)
+            Stream inputStream;
+
+            // Detect multipart/form-data
+            if (Request.HasFormContentType)
             {
-                return BadRequest("No file uploaded.");
+                var form = await Request.ReadFormAsync();
+                var file = form.Files.FirstOrDefault();
+
+                if (file == null || file.Length == 0)
+                    return BadRequest("No file uploaded.");
+    
+                inputStream = new MemoryStream();
+                await file.CopyToAsync(inputStream);
+                inputStream.Position = 0;
+            }
+            else
+            {
+                // Raw binary upload
+                inputStream = new MemoryStream();
+                await Request.Body.CopyToAsync(inputStream);
+                inputStream.Position = 0;
+
+                if (inputStream.Length == 0)
+                    return BadRequest("Empty request body.");
             }
 
-            using var input = new MemoryStream();
-            await file.CopyToAsync(input);
-            input.Position = 0;
+            var output = await _converter.ConvertAsync(inputStream, to);
 
-            _logger.LogInformation("Received file of length {Length} bytes, converting from {From} to {To}", input.Length, from, to);
-
-            var output = await _converter.ConvertAsync(input, from, to);
-
-            _logger.LogInformation("Conversion complete, output stream length: {Length} bytes", output.Length);
-
-            return File(output, $"image/{to?.ToLower()}", $"converted.{to?.ToLower()}");
+            return File(output, $"image/{to.ToLower()}", $"converted.{to.ToLower()}");
         }
+
     }
 }

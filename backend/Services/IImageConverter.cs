@@ -2,6 +2,6 @@ namespace file_conversion_api.Services
 {
     public interface IImageConverter
     {
-        Task<Stream> ConvertAsync(Stream input, string from, string to);
+        Task<Stream> ConvertAsync(Stream input, string to);
     }
 }
