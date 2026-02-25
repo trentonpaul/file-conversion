@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 namespace file_conversion_api.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("/api/[controller]")]
     public class ConvertController : ControllerBase
     {
         private readonly ILogger<ConvertController> _logger;
