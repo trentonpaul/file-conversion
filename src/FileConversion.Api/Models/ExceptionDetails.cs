@@ -1,5 +1,5 @@
 
-namespace file_conversion_api.Models
+namespace FileConversation.Api.Models
 {
     public class ExceptionDetails
     {

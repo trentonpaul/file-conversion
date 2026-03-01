@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using ImageMagick;
-using file_conversion_api.Services;
+using FileConversation.Api.Services;
 using Microsoft.AspNetCore.Http;
 
-namespace file_conversion_api.Controllers
+namespace FileConversation.Api.Controllers
 {
     [ApiController]
     [Route("/api/[controller]")]

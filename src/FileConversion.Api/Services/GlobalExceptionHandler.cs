@@ -1,7 +1,7 @@
-using file_conversion_api.Models;
+using FileConversation.Api.Models;
 using Microsoft.AspNetCore.Diagnostics;
 
-namespace file_conversion_api.Services
+namespace FileConversation.Api.Services
 {
     public class GlobalExceptionHandler : IExceptionHandler
     {
