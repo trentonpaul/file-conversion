@@ -1,6 +1,6 @@
 using ImageMagick;
 
-namespace FileConversation.Api.Services
+namespace FileConversion.Worker.Services
 {
     public class MagickImageConverter : IImageConverter
     {

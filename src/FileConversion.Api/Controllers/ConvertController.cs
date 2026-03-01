@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using ImageMagick;
-using FileConversation.Api.Services;
 using Microsoft.AspNetCore.Http;
 
 namespace FileConversation.Api.Controllers
@@ -10,12 +8,10 @@ namespace FileConversation.Api.Controllers
     public class ConvertController : ControllerBase
     {
         private readonly ILogger<ConvertController> _logger;
-        private readonly IImageConverter _converter;
 
-        public ConvertController(ILogger<ConvertController> logger, IImageConverter converter)
+        public ConvertController(ILogger<ConvertController> logger)
         {
             _logger = logger;
-            _converter = converter;
         }
 
         [HttpPost]
@@ -48,9 +44,14 @@ namespace FileConversation.Api.Controllers
                     return BadRequest("Empty request body.");
             }
 
-            var output = await _converter.ConvertAsync(inputStream, to);
-
-            return File(output, $"image/{to.ToLower()}", $"converted.{to.ToLower()}");
+            // TODO: Queue conversion job to worker instead of converting directly
+            // This could involve:
+            // - Storing the uploaded file in blob storage
+            // - Creating a job record in the database
+            // - Publishing a message to a job queue (RabbitMQ, Azure Service Bus, etc.)
+            // - Returning a job ID to the client
+            
+            return Accepted(new { message = "File conversion job queued. The worker will process it." });
         }
 
     }

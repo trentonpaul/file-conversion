@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.10.3" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,5 @@
 
-using FileConversation.Api.Services;
+using FileConversion.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,8 +7,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
-
-builder.Services.AddSingleton<IImageConverter, MagickImageConverter>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();

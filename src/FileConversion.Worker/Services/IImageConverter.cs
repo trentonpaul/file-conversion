@@ -1,4 +1,4 @@
-namespace FileConversation.Api.Services
+namespace FileConversion.Worker.Services
 {
     public interface IImageConverter
     {
