@@ -12,7 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FileConversion.Infrastructure\FileConversion.Infrastructure.csproj" />
     <ProjectReference Include="..\FileConversion.Shared\FileConversion.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="local-storage\uploads\" />
   </ItemGroup>
 
 </Project>

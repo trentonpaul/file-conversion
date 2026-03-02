@@ -1,5 +1,8 @@
 
 using FileConversion.Api.Services;
+using FileConversion.Infrastructure;
+using FileConversion.Infrastructure.Settings;
+using FileConversion.Shared.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +13,18 @@ builder.Services.AddControllers();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services.Configure<StorageSettings>(
+    builder.Configuration.GetSection("Storage"));
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+    builder.Services.AddScoped<IJobRepository, SqliteJobRepository>();
+    builder.Services.AddScoped<IMessagePublisher, RabbitMqPublisher>();
+}
+
+builder.Services.AddScoped<IJobService, JobService>();
 
 var app = builder.Build();
 
