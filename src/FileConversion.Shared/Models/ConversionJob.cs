@@ -4,22 +4,27 @@ using System.Text;
 
 namespace FileConversion.Shared.Models
 {
+
     public class ConversionJob
     {
         public Guid Id { get; }
-        public Guid FileId { get; }
+        public string OriginalFileName { get; }
+        public string UploadFilePath { get; }
         public string TargetFormat { get; }
         public DateTime CreatedAt { get; }
-        public JobStatus Status { get; private set; }
-        public string? OutputFilePath { get; private set; }
+        public JobStatus Status { get; set; }
+        public string? OutputFilePath { get; set; }
         public string? ErrorMessage { get; private set; }
 
-        public ConversionJob(Guid fileId, string targetFormat)
+        private ConversionJob() { } // for EF only
+
+        public ConversionJob(string originalFileName, string uploadFilePath, string targetFormat)
         {
             Id = Guid.NewGuid();
-            FileId = fileId;
+            OriginalFileName = originalFileName;
+            UploadFilePath = uploadFilePath;
             TargetFormat = targetFormat;
-            CreatedAt = DateTime.Now;
+            CreatedAt = DateTime.UtcNow;
             Status = JobStatus.Pending;
         }
     }

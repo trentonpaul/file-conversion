@@ -1,12 +1,12 @@
 ﻿using FileConversion.Infrastructure.Settings;
 using FileConversion.Shared.Interfaces;
 using Microsoft.Extensions.Options;
+using System.Runtime.CompilerServices;
 
 namespace FileConversion.Infrastructure
 {
     public class LocalFileStorage : IFileStorage
     {
-
         private readonly StorageSettings _storageSettings;
 
         public LocalFileStorage(IOptions<StorageSettings> storageSettings)
@@ -14,17 +14,20 @@ namespace FileConversion.Infrastructure
             _storageSettings = storageSettings.Value;
         }
 
-        public Task DeleteFileAsync(Guid fileId)
+        public Task DeleteFileAsync(string filePath)
         {
-            throw new NotImplementedException();
+            File.Delete(filePath);
+            return Task.CompletedTask;
         }
 
-        public Task<Stream> GetFileAsync(Guid fileId)
+        public Task<Stream> GetFileAsync(string filePath)
         {
-            throw new NotImplementedException();
+            var stream = File.OpenRead(filePath) as Stream;
+
+            return Task.FromResult(stream);
         }
 
-        public async Task<Guid> SaveFileAsync(Stream stream, string fileName)
+        public async Task<string> SaveFileAsync(Stream stream, string fileName)
         {
             if (stream.CanSeek)
             {
@@ -33,21 +36,21 @@ namespace FileConversion.Infrastructure
 
             var fileId = Guid.NewGuid();
 
-            var uploadsDirectory = Path.Combine(_storageSettings.BasePath, "uploads");
+            var uploadsDirectory = _storageSettings.BasePath;
+
+            var path = Path.Combine(uploadsDirectory, $"{fileId}_{fileName}");
 
             if (!Directory.Exists(uploadsDirectory))
             {
                 Directory.CreateDirectory(uploadsDirectory);
             }
 
-            var path = Path.Combine(uploadsDirectory, $"{fileId}_fileName");
-
             using (FileStream fileStream = new FileStream(path, FileMode.Create, FileAccess.Write))
             {
                 await stream.CopyToAsync(fileStream);
             }
 
-            return fileId;
+            return path;
         }
     }
 }

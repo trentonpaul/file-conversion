@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /app
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["src/FileConversion.Api/FileConversion.Api.csproj", "src/FileConversion.Api/"]
+COPY ["src/FileConversion.Shared/FileConversion.Shared.csproj", "src/FileConversion.Shared/"]
+COPY ["src/FileConversion.Infrastructure/FileConversion.Infrastructure.csproj", "src/FileConversion.Infrastructure/"]
+RUN dotnet restore "src/FileConversion.Api/FileConversion.Api.csproj"
+COPY . .
+RUN dotnet publish "src/FileConversion.Api/FileConversion.Api.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "FileConversion.Api.dll"]

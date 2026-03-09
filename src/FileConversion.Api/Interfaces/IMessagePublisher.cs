@@ -1,9 +1,9 @@
 ﻿using FileConversion.Shared.Models;
 
-namespace FileConversion.Shared.Interfaces
+namespace FileConversion.Api.Interfaces
 {
     public interface IMessagePublisher
     {
-        Task PublishAsync(ConversionJob job);
+        Task PublishAsync(Guid jobId);
     }
 }

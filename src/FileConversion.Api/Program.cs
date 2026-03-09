@@ -1,43 +1,48 @@
-
+using FileConversion.Api.Interfaces;
 using FileConversion.Api.Services;
 using FileConversion.Infrastructure;
 using FileConversion.Infrastructure.Settings;
 using FileConversion.Shared.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
-
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.Configure<StorageSettings>(
     builder.Configuration.GetSection("Storage"));
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection("RabbitMq"));
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
-    builder.Services.AddScoped<IJobRepository, SqliteJobRepository>();
-    builder.Services.AddScoped<IMessagePublisher, RabbitMqPublisher>();
-}
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IJobRepository, JobRepository>();
 builder.Services.AddScoped<IJobService, JobService>();
+builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+builder.Services.AddScoped<IMessagePublisher, RabbitMqPublisher>();
+
+// Singleton - one shared RabbitMQ connection per application lifetime
+builder.Services.AddSingleton<RabbitMqConnectionFactory>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
-{
     app.MapOpenApi();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (args.Contains("--migrate-only"))
+    {
+        db.Database.Migrate();
+        return;
+    }
 }
 
-// app.UseHttpsRedirection();
-
-app.MapControllers();
-
 app.UseExceptionHandler();
-
+app.MapControllers();
 app.Run();

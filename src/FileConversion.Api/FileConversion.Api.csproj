@@ -9,15 +9,15 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FileConversion.Infrastructure\FileConversion.Infrastructure.csproj" />
     <ProjectReference Include="..\FileConversion.Shared\FileConversion.Shared.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="local-storage\uploads\" />
   </ItemGroup>
 
 </Project>

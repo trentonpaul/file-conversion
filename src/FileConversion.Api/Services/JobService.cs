@@ -1,4 +1,5 @@
-﻿using FileConversion.Shared.Interfaces;
+﻿using FileConversion.Api.Interfaces;
+using FileConversion.Shared.Interfaces;
 using FileConversion.Shared.Models;
 
 namespace FileConversion.Api.Services
@@ -18,14 +19,16 @@ namespace FileConversion.Api.Services
             _messagePublisher = messagePublisher ?? throw new ArgumentNullException(nameof(messagePublisher));
         }
 
-        public async Task<Guid> SubmitJobAsync(Stream file, string fileName, string targetFormat)
+        public async Task<ConversionJob> SubmitJobAsync(Stream file, string fileName, string targetFormat)
         {
-            var fileId = await _fileStorage.SaveFileAsync(file, fileName);
+            var filePath = await _fileStorage.SaveFileAsync(file, fileName);
             
-            var conversionJob = new ConversionJob(fileId, targetFormat);
-            _logger.LogInformation($"File with name {fileName} stored successfully with the id {fileId}");
-            await _messagePublisher.PublishAsync(conversionJob);
-            return await _jobRepository.CreateJobAsync(conversionJob);
+            var conversionJob = new ConversionJob(fileName, filePath, targetFormat);
+            _logger.LogInformation($"File with name {fileName} stored successfully at {filePath}");
+            await _jobRepository.CreateJobAsync(conversionJob);
+            await _messagePublisher.PublishAsync(conversionJob.Id);
+
+            return conversionJob;
         }
     }
 }

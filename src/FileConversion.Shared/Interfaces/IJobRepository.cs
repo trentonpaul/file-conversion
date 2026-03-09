@@ -7,7 +7,8 @@ namespace FileConversion.Shared.Interfaces
 {
     public interface IJobRepository
     {
-        Task<Guid> CreateJobAsync(ConversionJob job);
-        Task<ConversionJob> GetJobAsync(Guid jobId);
+        Task<ConversionJob> CreateJobAsync(ConversionJob job);
+        Task<ConversionJob?> GetJobAsync(Guid jobId);
+        Task<ConversionJob> UpdateJobAsync(ConversionJob job);
     }
 }

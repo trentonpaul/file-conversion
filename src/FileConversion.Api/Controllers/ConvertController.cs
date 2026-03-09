@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
-using FileConversion.Api.Services;
 using System.Collections.Immutable;
+using FileConversion.Api.Interfaces;
 
 namespace FileConversation.Api.Controllers
 {
@@ -44,9 +44,9 @@ namespace FileConversation.Api.Controllers
             // - Publishing a message to a job queue (RabbitMQ, Azure Service Bus, etc.)
             // - Returning a job ID to the client
 
-            Guid jobId = await _jobService.SubmitJobAsync(inputStream, fileName, to);
+            var job = await _jobService.SubmitJobAsync(inputStream, fileName, to);
             
-            return Accepted(new { message = $"File conversion job queued (Job ID: {jobId}). The worker will process it." });
+            return Accepted(new { message = $"File conversion job queued (Job ID: {job.Id}). The worker will process it." });
         }
 
     }

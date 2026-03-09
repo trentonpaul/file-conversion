@@ -1,10 +1,105 @@
 services:
   api:
+    container_name: fileconversion_api
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: file-conversion-api-backend
+      context: .
+      dockerfile: docker/Dockerfile.api
     ports:
-      - "8080:8080"
+      - 5000:8080
     environment:
-      ASPNETCORE_URLS: http://0.0.0.0:8080
+      - ASPNETCORE_URLS=http://+:8080
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__Port=5672
+      - RabbitMq__UserName=${RABBITMQ_DEFAULT_USER}
+      - RabbitMq__Password=${RABBITMQ_DEFAULT_PASS}
+      - RabbitMq__QueueName=conversion-jobs
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
+      - Storage__BasePath=/app/storage
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - shared-storage:/app/storage
+  migrator:
+    container_name: fileconversion_migrator
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["dotnet", "FileConversionApi.dll", "--migrate-only"]
+    restart: "no"
+  worker:
+    container_name: fileconversion_worker
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      - RabbitMq__HostName=rabbitmq
+      - RabbitMq__Port=5672
+      - RabbitMq__UserName=${RABBITMQ_DEFAULT_USER}
+      - RabbitMq__Password=${RABBITMQ_DEFAULT_PASS}
+      - RabbitMq__QueueName=conversion-jobs
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
+      - Storage__BasePath=/app/storage
+    depends_on:
+      - rabbitmq
+      - db
+    volumes:
+      - shared-storage:/app/storage
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: fileconversion_rabbitmq
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    configs:
+      - source: rabbitmq-plugins
+        target: /etc/rabbitmq/enabled_plugins
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq-lib:/var/lib/rabbitmq/
+      - rabbitmq-log:/var/log/rabbitmq
+  db:
+    image: postgres:latest
+    container_name: fileconversion_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+configs:
+  rabbitmq-plugins:
+    content: "[rabbitmq_management]."  
+
+volumes:
+  rabbitmq-lib:
+    driver: local
+  rabbitmq-log:
+    driver: local
+  pgdata:
+  shared-storage:
+    driver: local

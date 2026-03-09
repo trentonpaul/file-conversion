@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Parallel File Upload Test</title>
+</head>
+<body>
+  <h2>Parallel File Upload Test</h2>
+
+  <input type="file" id="fileInput" accept="image/jpeg" />
+  <button id="sendBtn">Send 10 Requests</button>
+
+  <pre id="log"></pre>
+
+  <script>
+    const url = "http://localhost:5000/api/convert?from=jpeg&to=png";
+    const logEl = document.getElementById("log");
+
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+    }
+
+    async function sendRequest(i, file) {
+      const form = new FormData();
+      form.append("file", file);
+
+      log(`Starting request ${i}...`);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          body: form
+        });
+
+        log(`Request ${i} completed with status: ${response.status}`);
+      } catch (err) {
+        log(`Request ${i} failed: ${err}`);
+      }
+    }
+
+    document.getElementById("sendBtn").onclick = async () => {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please select a JPEG file first.");
+        return;
+      }
+
+      log("Sending 10 parallel requests...\n");
+
+      const tasks = [];
+      for (let i = 1; i <= 10; i++) {
+        tasks.push(sendRequest(i, file));
+      }
+
+      await Promise.all(tasks);
+
+      log("\nAll requests finished.");
+    };
+  </script>
+</body>
+</html>
