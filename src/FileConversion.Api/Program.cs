@@ -54,7 +54,7 @@ app.UseExceptionHandler();
 app.UseCors("AllowAll");
 app.MapControllers();
 
-// Minimal ping endpoint
+// For health check
 app.MapGet("/ping", () => Results.Ok("pong"));
 
 app.Run();

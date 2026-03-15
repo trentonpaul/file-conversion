@@ -21,11 +21,8 @@ namespace FileConversion.Api.Controllers
 
         [HttpPost]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> Convert(
-            [FromQuery] string to)
+        public async Task<IActionResult> Convert([FromQuery] string to)
         {
-            Stream inputStream;
-
             var form = await Request.ReadFormAsync();
             var file = form.Files.FirstOrDefault();
 
@@ -36,16 +33,17 @@ namespace FileConversion.Api.Controllers
                     Error = new ApiError { Code = "NoFile", Message = "No file uploaded." }
                 });
 
-            inputStream = new MemoryStream();
+            using var inputStream = new MemoryStream();
             await file.CopyToAsync(inputStream);
             inputStream.Position = 0;
 
-            var fileName = file.FileName;
+            var job = await _jobService.SubmitJobAsync(inputStream, file.FileName, to);
 
-            var job = await _jobService.SubmitJobAsync(inputStream, fileName, to);
-
-            var payload = new JobAcceptedDto { JobId = job.Id };
-            return Accepted(new ApiResponse<JobAcceptedDto> { Success = true, Data = payload });
+            return Accepted(new ApiResponse<JobAcceptedDto>
+            {
+                Success = true,
+                Data = new JobAcceptedDto { JobId = job.Id }
+            });
         }
 
         [HttpGet("{id}")]
@@ -59,38 +57,39 @@ namespace FileConversion.Api.Controllers
                     Error = new ApiError { Code = "NotFound", Message = $"Job with ID {id} not found." }
                 });
 
-            var payload = new JobStatusDto { Status = jobStatus.ToString() };
-            return Ok(new ApiResponse<JobStatusDto> { Success = true, Data = payload });
+            return Ok(new ApiResponse<JobStatusDto>
+            {
+                Success = true,
+                Data = new JobStatusDto { Status = jobStatus.ToString() }
+            });
         }
 
         [HttpGet("{id}/result")]
         public async Task<IActionResult> GetJobResult(Guid id)
         {
             var result = await _jobService.GetJobResultsAsync(id);
+
             if (!result.Exists)
-            {
                 return NotFound(new ApiResponse<object>
                 {
                     Success = false,
                     Error = new ApiError { Code = "NotFound", Message = $"Job with ID {id} not found." }
                 });
-            }
+
             if (result.Status == JobStatus.Failed)
-            {
                 return UnprocessableEntity(new ApiResponse<object>
                 {
                     Success = false,
                     Error = new ApiError { Code = "JobFailed", Message = result.ErrorMessage ?? "Job failed." }
                 });
-            }
+
             if (result.Status != JobStatus.Complete || result.FileStream == null)
-            {
                 return StatusCode(StatusCodes.Status409Conflict, new ApiResponse<object>
                 {
                     Success = false,
                     Error = new ApiError { Code = "NotReady", Message = $"Results for job {id} not ready. Status: {result.Status}" }
                 });
-            }
+
             return File(result.FileStream, "application/octet-stream", result.FileName);
         }
 
@@ -99,75 +98,90 @@ namespace FileConversion.Api.Controllers
         public async Task<IActionResult> BatchConvert([FromForm] BatchConvertRequestDto request)
         {
             if (request.Files == null || request.Files.Count == 0)
-            {
                 return BadRequest(new ApiResponse<object>
                 {
                     Success = false,
                     Error = new ApiError { Code = "NoFiles", Message = "No files uploaded." }
                 });
-            }
-            if (request.TargetFormat == null || request.TargetFormat.Trim() == String.Empty)
-            {
+
+            if (string.IsNullOrWhiteSpace(request.TargetFormat))
                 return BadRequest(new ApiResponse<object>
                 {
                     Success = false,
                     Error = new ApiError { Code = "NoTargetFormat", Message = "Target format is required." }
                 });
-            }
+
             var jobs = new List<JobAcceptedDto>();
+
             foreach (var file in request.Files)
             {
-                using var ms = new MemoryStream();
+                var ms = new MemoryStream();
                 await file.CopyToAsync(ms);
                 ms.Position = 0;
                 var job = await _jobService.SubmitJobAsync(ms, file.FileName, request.TargetFormat);
                 jobs.Add(new JobAcceptedDto { JobId = job.Id });
             }
-            return Accepted(new ApiResponse<BatchConvertResponseDto> { Success = true, Data = new BatchConvertResponseDto { Jobs = jobs } });
+
+            return Accepted(new ApiResponse<BatchConvertResponseDto>
+            {
+                Success = true,
+                Data = new BatchConvertResponseDto { Jobs = jobs }
+            });
         }
 
         [HttpPost("batch/status")]
         public async Task<IActionResult> BatchJobStatus([FromBody] BatchJobStatusRequestDto request)
         {
-            var statuses = new List<JobStatusItemDto>();
             var jobStatuses = await _jobService.GetJobStatusesAsync(request.JobIds);
-            int i = 0;
-            foreach (var jobId in request.JobIds)
+
+            var statuses = request.JobIds.Zip(jobStatuses)
+                .Select(pair => new JobStatusItemDto
+                {
+                    JobId = pair.First,
+                    Status = pair.Second?.ToString() ?? "NotFound"
+                })
+                .ToList();
+
+            return Ok(new ApiResponse<BatchJobStatusResponseDto>
             {
-                var status = jobStatuses[i++];
-                statuses.Add(new JobStatusItemDto { JobId = jobId, Status = status?.ToString() ?? "NotFound" });
-            }
-            return Ok(new ApiResponse<BatchJobStatusResponseDto> { Success = true, Data = new BatchJobStatusResponseDto { Statuses = statuses } });
+                Success = true,
+                Data = new BatchJobStatusResponseDto { Statuses = statuses }
+            });
         }
 
         [HttpPost("batch/results")]
         public async Task<IActionResult> BatchJobResults([FromBody] BatchJobResultRequestDto request)
         {
-            var results = new List<JobResultItemDto>();
             var jobResults = await _jobService.GetJobResultsAsync(request.JobIds);
-            int i = 0;
-            foreach (var jobId in request.JobIds)
+
+            var results = request.JobIds.Zip(jobResults)
+                .Select(pair =>
+                {
+                    var (jobId, result) = pair;
+
+                    if (!result.Exists)
+                        return new JobResultItemDto { JobId = jobId, Status = "NotFound", Error = "Job not found." };
+
+                    if (result.Status == JobStatus.Failed)
+                        return new JobResultItemDto { JobId = jobId, Status = "Failed", Error = result.ErrorMessage ?? "Job failed." };
+
+                    if (result.Status != JobStatus.Complete || result.FileStream == null)
+                        return new JobResultItemDto { JobId = jobId, Status = result.Status?.ToString() ?? "Unknown", Error = "Job not ready." };
+
+                    return new JobResultItemDto
+                    {
+                        JobId = jobId,
+                        Status = "Complete",
+                        DownloadUrl = Url.Action(nameof(GetJobResult), new { id = jobId })
+                    };
+                })
+                .ToList();
+
+            return Ok(new ApiResponse<BatchJobResultResponseDto>
             {
-                var result = jobResults[i++];
-                if (!result.Exists)
-                {
-                    results.Add(new JobResultItemDto { JobId = jobId, Status = "NotFound", Error = "Job not found." });
-                }
-                else if (result.Status == JobStatus.Failed)
-                {
-                    results.Add(new JobResultItemDto { JobId = jobId, Status = "Failed", Error = result.ErrorMessage ?? "Job failed." });
-                }
-                else if (result.Status != JobStatus.Complete || result.FileStream == null)
-                {
-                    results.Add(new JobResultItemDto { JobId = jobId, Status = result.Status?.ToString() ?? "Unknown", Error = "Job not ready." });
-                }
-                else
-                {
-                    var url = Url.Action(nameof(GetJobResult), new { id = jobId });
-                    results.Add(new JobResultItemDto { JobId = jobId, Status = "Complete", DownloadUrl = url });
-                }
-            }
-            return Ok(new ApiResponse<BatchJobResultResponseDto> { Success = true, Data = new BatchJobResultResponseDto { Results = results } });
+                Success = true,
+                Data = new BatchJobResultResponseDto { Results = results }
+            });
         }
     }
 }
