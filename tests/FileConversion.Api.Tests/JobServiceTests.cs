@@ -96,7 +96,26 @@ namespace FileConversion.Api.Tests
             await Assert.ThrowsAsync<Exception>(() =>
                 _service.SubmitJobAsync(stream, "sample.png", "webp"));
 
-            _jobRepository.Verify(x => x.CreateJobAsync(It.IsAny<ConversionJob>()), Times.Never);
+            // CreateJobAsync should be called even if PublishAsync fails
+            _jobRepository.Verify(x => x.CreateJobAsync(It.IsAny<ConversionJob>()), Times.Once);
+            // PublishAsync should have been called once
+            _messagePublisher.Verify(x => x.PublishAsync(It.IsAny<Guid>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task SubmitJobAsync_ShouldNotPublish_WhenRepositoryFails()
+        {
+            _fileStorage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>()))
+                .ReturnsAsync(Guid.NewGuid().ToString());
+            _jobRepository.Setup(x => x.CreateJobAsync(It.IsAny<ConversionJob>()))
+                .ThrowsAsync(new Exception("Repository unavailable"));
+
+            using var stream = new MemoryStream(new byte[] { 0x01, 0x02, 0x03 });
+
+            await Assert.ThrowsAsync<Exception>(() =>
+                _service.SubmitJobAsync(stream, "sample.png", "webp"));
+
+            _messagePublisher.Verify(x => x.PublishAsync(It.IsAny<Guid>()), Times.Never);
         }
 
     }

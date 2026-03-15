@@ -23,7 +23,6 @@ namespace FileConversion.Api.Services
         public async Task<ConversionJob> SubmitJobAsync(Stream file, string fileName, string targetFormat)
         {
             var filePath = await _fileStorage.SaveFileAsync(file, fileName);
-            
             var conversionJob = new ConversionJob(fileName, filePath, targetFormat);
             _logger.LogInformation($"File with name {fileName} stored successfully at {filePath}");
             await _jobRepository.CreateJobAsync(conversionJob);
