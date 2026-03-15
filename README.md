@@ -57,6 +57,11 @@ kubectl get pods -n fileconversion -w  # watch API and worker scaling
 
 Use `Invoke-WebRequest -Uri http://localhost:8080/ping` to confirm API health.
 
+### UI test
+If the API is running locally on port 8080, open `test-client/index.html` in your browser (or use a lightweight local web server) to test conversions with a user interface.
+
+> ![Client Demo](/file-conversion-demo.gif)
+
 ## What I built
 
 - API upload + queue enqueue + job status model
