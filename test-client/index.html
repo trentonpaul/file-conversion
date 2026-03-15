@@ -568,7 +568,7 @@
                     <div>
                         <span class="field-label">01 — Source File</span>
                         <div class="dropzone" id="dropzone">
-                            <input type="file" id="fileInput" accept="image/*" />
+                            <input type="file" id="fileInput" accept="image/*" multiple />
                             <div class="drop-icon">
                                 <!-- ...svg... -->
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -598,10 +598,10 @@
                         </div>
                     </div>
 
-                    <!-- Job count selector -->
+                    <!-- File count summary -->
                     <div>
-                        <span class="field-label">03 — Number of Jobs</span>
-                        <input type="number" id="jobCount" min="1" max="30" value="1" style="width:60px; font-size:14px; padding:4px; border-radius:2px; border:1px solid var(--border); background:var(--surface); color:var(--text);">
+                        <span class="field-label">03 — Files Selected</span>
+                        <div id="fileCount" style="font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-top:4px;">0 files selected</div>
                     </div>
 
                     <!-- Submit -->
@@ -649,6 +649,7 @@
                         <thead>
                             <tr>
                                 <th style="padding:4px 8px; border-bottom:1px solid var(--border);">#</th>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">File Name</th>
                                 <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Job ID</th>
                                 <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Status</th>
                                 <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Progress</th>
@@ -668,7 +669,7 @@
 
     <script>
   // ─── Config ───────────────────────────────────────────────────────────────
-  const BASE = 'http://localhost:8512';
+  const BASE = 'http://localhost:8080';
   const API = {
     submit:  (fmt) => `${BASE}/api/Convert?to=${encodeURIComponent(fmt)}`,
     status:  (id)  => `${BASE}/api/Convert/${id}`,
@@ -681,17 +682,17 @@
   const MAX_POLLS = 60;
 
   // ─── State ────────────────────────────────────────────────────────────────
-  let selectedFile = null;
+  let selectedFiles = [];
   let selectedFormat = 'png';
 
   // ─── Elements ─────────────────────────────────────────────────────────────
   const dropzone    = document.getElementById('dropzone');
   const fileInput   = document.getElementById('fileInput');
   const fileName    = document.getElementById('fileName');
+  const fileCount   = document.getElementById('fileCount');
   const formatGrid  = document.getElementById('formatGrid');
   const submitBtn   = document.getElementById('submitBtn');
   const resetBtn    = document.getElementById('resetBtn');
-  const jobCountInput = document.getElementById('jobCount');
   const bulkStatusPanels = document.getElementById('bulkStatusPanels');
   const bulkStatusPanel = document.getElementById('bulkStatusPanel');
   const bulkStatusIndicator = document.getElementById('bulkStatusIndicator');
@@ -702,7 +703,7 @@
 
   // ─── File handling ────────────────────────────────────────────────────────
   fileInput.addEventListener('change', (e) => {
-    if (e.target.files[0]) setFile(e.target.files[0]);
+    setFiles(Array.from(e.target.files || []));
   });
 
   dropzone.addEventListener('dragover', (e) => {
@@ -717,14 +718,22 @@
   dropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) setFile(file);
+    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'));
+    if (files.length > 0) setFiles(files);
   });
 
-  function setFile(file) {
-    selectedFile = file;
-    fileName.textContent = file.name;
-    dropzone.classList.add('has-file');
+  function setFiles(files) {
+    selectedFiles = files.slice(0, 50); // limit to avoid huge requests
+    if (selectedFiles.length === 0) {
+      fileName.textContent = '';
+      fileCount.textContent = '0 files selected';
+      dropzone.classList.remove('has-file');
+    } else {
+      const names = selectedFiles.map(f => f.name).join(', ');
+      fileName.textContent = selectedFiles.length === 1 ? names : `${selectedFiles.length} files selected`;
+      fileCount.textContent = `${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected`;
+      dropzone.classList.add('has-file');
+    }
     updateSubmitState();
   }
 
@@ -740,16 +749,16 @@
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   function updateSubmitState() {
-    submitBtn.disabled = !selectedFile;
+    submitBtn.disabled = selectedFiles.length === 0;
   }
 
   submitBtn.addEventListener('click', async () => {
-    if (!selectedFile) return;
-    const jobCount = Math.max(1, Math.min(30, parseInt(jobCountInput.value, 10) || 1));
-    await submitBulkJobs(jobCount);
+    if (selectedFiles.length === 0) return;
+    await submitBulkJobs(selectedFiles);
   });
 
-  async function submitBulkJobs(jobCount) {
+  async function submitBulkJobs(files) {
+    const jobCount = files.length;
     submitBtn.disabled = true;
     submitBtn.textContent = `QUEUING ${jobCount}…`;
     resetBtn.classList.remove('visible');
@@ -763,8 +772,8 @@
 
     // Prepare FormData for batch
     const fd = new FormData();
-    for (let i = 0; i < jobCount; i++) {
-      fd.append('Files', selectedFile, selectedFile.name); // API expects 'Files'
+    for (const file of files) {
+      fd.append('Files', file, file.name); // API expects 'Files'
     }
     fd.append('TargetFormat', selectedFormat);
 
@@ -773,6 +782,7 @@
     for (let i = 0; i < jobCount; i++) {
       jobs.push({
         index: i + 1,
+        fileName: files[i]?.name || 'Unknown',
         jobId: null,
         status: 'Queued',
         progress: null,
@@ -901,8 +911,7 @@
         }
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td style="padding:4px 8px;">${job.index}</td>
-          <td style="padding:4px 8px;">${job.jobId ? job.jobId : '<span style=\"color:var(--text-muted);\">—</span>'}</td>
+          <td style="padding:4px 8px;">${job.index}</td>          <td style="padding:4px 8px;">${escapeHtml(job.fileName || '—')}</td>          <td style="padding:4px 8px;">${job.jobId ? job.jobId : '<span style=\"color:var(--text-muted);\">—</span>'}</td>
           <td style="padding:4px 8px;">
             <span style="color:${job.error ? 'var(--red)' : (job.done ? 'var(--green)' : 'var(--text-dim)')};">
               ${job.error ? 'Error' : (job.done ? 'Done' : job.status)}
@@ -942,10 +951,11 @@
 
   // Reset logic (update to hide bulk panel)
   resetBtn.addEventListener('click', () => {
-    selectedFile = null;
+    selectedFiles = [];
     fileInput.value = '';
     dropzone.classList.remove('has-file');
     fileName.textContent = '';
+    fileCount.textContent = '0 files selected';
     bulkStatusPanel.style.display = 'none';
     submitBtn.textContent = 'CONVERT';
     submitBtn.disabled = true;
