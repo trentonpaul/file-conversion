@@ -486,3 +486,6 @@ $RECYCLE.BIN/
 
 # Local storage
 local-storage
+
+# Kubernetes
+k8s/secrets.yaml

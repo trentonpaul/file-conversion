@@ -1,4 +1,5 @@
 ﻿using Castle.Core.Logging;
+using FileConversion.Api.Interfaces;
 using FileConversion.Api.Services;
 using FileConversion.Shared.Interfaces;
 using FileConversion.Shared.Models;
@@ -8,6 +9,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace FileConversion.Api.Tests
 {
@@ -31,16 +34,17 @@ namespace FileConversion.Api.Tests
         [Fact]
         public async Task SubmitJobAsync_ShouldReturnJobId()
         {
+            // SaveFileAsync returns Task<string> per interface -> return a string (not Guid)
             _fileStorage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>()))
-                .ReturnsAsync(Guid.NewGuid());
+                .ReturnsAsync(Guid.NewGuid().ToString());
             _jobRepository.Setup(x => x.CreateJobAsync(It.IsAny<ConversionJob>()))
-                .ReturnsAsync(Guid.NewGuid());
-            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<ConversionJob>()))
+                .Returns((ConversionJob job) => Task.FromResult(job));
+            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<Guid>()))
                 .Returns(Task.CompletedTask);
 
             using var stream = new MemoryStream(new byte[] { 0x01, 0x02, 0x03 });
             var result = await _service.SubmitJobAsync(stream, "sample.png", "webp");
-            Assert.NotEqual(Guid.Empty, result);
+            Assert.NotNull(result);
         }
 
         [Fact]
@@ -49,11 +53,11 @@ namespace FileConversion.Api.Tests
             ConversionJob? capturedJob = null;
 
             _fileStorage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>()))
-                .ReturnsAsync(Guid.NewGuid());
+                .ReturnsAsync(Guid.NewGuid().ToString());
             _jobRepository.Setup(x => x.CreateJobAsync(It.IsAny<ConversionJob>()))
                 .Callback<ConversionJob>(job => capturedJob = job)
-                .ReturnsAsync(Guid.NewGuid());
-            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<ConversionJob>()))
+                .Returns((ConversionJob job) => Task.FromResult(job));
+            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<Guid>()))
                 .Returns(Task.CompletedTask);
 
             using var stream = new MemoryStream(new byte[] { 0x01, 0x02, 0x03 });
@@ -75,16 +79,16 @@ namespace FileConversion.Api.Tests
             await Assert.ThrowsAsync<Exception>(() =>
                 _service.SubmitJobAsync(stream, "sample.png", "webp"));
 
-            _messagePublisher.Verify(x => x.PublishAsync(It.IsAny<ConversionJob>()), Times.Never);
+            _messagePublisher.Verify(x => x.PublishAsync(It.IsAny<Guid>()), Times.Never);
         }
 
         [Fact]
         public async Task SubmitJobAsync_ShouldNotSaveJob_WhenPublishFails()
         {
             _fileStorage.Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>()))
-                .ReturnsAsync(Guid.NewGuid());
+                .ReturnsAsync(Guid.NewGuid().ToString());
 
-            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<ConversionJob>()))
+            _messagePublisher.Setup(x => x.PublishAsync(It.IsAny<Guid>()))
                 .ThrowsAsync(new Exception("RabbitMQ unavailable"));
 
             using var stream = new MemoryStream(new byte[] { 0x01, 0x02, 0x03 });

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: fileconversion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: fileconversion-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: RabbitMq__HostName
+              value: rabbitmq
+            - name: RabbitMq__Port
+              value: "5672"
+            - name: RabbitMq__QueueName
+              value: conversion-jobs
+            - name: RabbitMq__UserName
+              valueFrom:
+                secretKeyRef:
+                  name: fileconversion-secrets
+                  key: rabbitmq-user
+            - name: RabbitMq__Password
+              valueFrom:
+                secretKeyRef:
+                  name: fileconversion-secrets
+                  key: rabbitmq-pass
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fileconversion-secrets
+                  key: connection-string
+            - name: Storage__BasePath
+              value: /app/storage
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /app/storage
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: shared-storage-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: fileconversion
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP

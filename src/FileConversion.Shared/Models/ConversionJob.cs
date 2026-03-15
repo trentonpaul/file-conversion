@@ -14,7 +14,7 @@ namespace FileConversion.Shared.Models
         public DateTime CreatedAt { get; }
         public JobStatus Status { get; set; }
         public string? OutputFilePath { get; set; }
-        public string? ErrorMessage { get; private set; }
+        public string? ErrorMessage { get; set; }
 
         private ConversionJob() { } // for EF only
 

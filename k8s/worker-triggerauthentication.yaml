@@ -1,0 +1,10 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-rabbitmq-auth
+  namespace: fileconversion
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: fileconversion-secrets
+      key: rabbitmq-keda-host

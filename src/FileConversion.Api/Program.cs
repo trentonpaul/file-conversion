@@ -12,6 +12,13 @@ builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+// Enable CORS - allow all origins, methods and headers (for development / testing)
+builder.Services.AddCors(options =>
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader()));
+
 builder.Services.Configure<StorageSettings>(
     builder.Configuration.GetSection("Storage"));
 builder.Services.Configure<RabbitMqSettings>(
@@ -44,5 +51,10 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseExceptionHandler();
+app.UseCors("AllowAll");
 app.MapControllers();
+
+// Minimal ping endpoint
+app.MapGet("/ping", () => Results.Ok("pong"));
+
 app.Run();

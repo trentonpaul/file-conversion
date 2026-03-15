@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrator
+  namespace: fileconversion
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrator
+          image: fileconversion-api:latest
+          imagePullPolicy: Never
+          args: ["--migrate-only"]
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: fileconversion-secrets
+                  key: connection-string

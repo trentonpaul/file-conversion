@@ -1,63 +1,961 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Parallel File Upload Test</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TRANSMUTE — Image Converter</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --border: #222222;
+            --border-lit: #3a3a3a;
+            --accent: #e8ff47;
+            --accent-dim: #b8cc35;
+            --text: #e8e8e8;
+            --text-muted: #666;
+            --text-dim: #999;
+            --red: #ff4747;
+            --green: #47ff8a;
+            --mono: 'DM Mono', monospace;
+            --display: 'Bebas Neue', sans-serif;
+            --body: 'DM Sans', sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--body);
+            font-size: 15px;
+        }
+
+            /* Noise overlay */
+            body::before {
+                content: '';
+                position: fixed;
+                inset: 0;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+                pointer-events: none;
+                z-index: 9999;
+                opacity: 0.5;
+            }
+
+        .page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 48px 24px 80px;
+            position: relative;
+        }
+
+            /* Decorative grid lines */
+            .page::after {
+                content: '';
+                position: fixed;
+                inset: 0;
+                background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+                background-size: 48px 48px;
+                pointer-events: none;
+                z-index: 0;
+            }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 640px;
+        }
+
+        /* Header */
+        header {
+            margin-bottom: 48px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .logo {
+            font-family: var(--display);
+            font-size: 64px;
+            letter-spacing: 6px;
+            color: var(--accent);
+            line-height: 1;
+            text-shadow: 0 0 40px rgba(232, 255, 71, 0.2);
+        }
+
+        .tagline {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* Card */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            flex-shrink: 0;
+        }
+
+        .card-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .card-body {
+            padding: 28px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Drop zone */
+        .dropzone {
+            border: 1px dashed var(--border-lit);
+            border-radius: 2px;
+            padding: 40px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .dropzone.dragover {
+                border-color: var(--accent);
+                background: rgba(232, 255, 71, 0.04);
+            }
+
+            .dropzone.has-file {
+                border-color: var(--accent);
+                border-style: solid;
+            }
+
+            .dropzone input[type="file"] {
+                position: absolute;
+                inset: 0;
+                opacity: 0;
+                cursor: pointer;
+                width: 100%;
+                height: 100%;
+            }
+
+        .drop-icon {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--border-lit);
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .dropzone.has-file .drop-icon {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .drop-text-main {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .drop-text-sub {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .file-name {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--accent);
+            background: rgba(232, 255, 71, 0.08);
+            padding: 4px 10px;
+            border-radius: 2px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: none;
+        }
+
+        .dropzone.has-file .file-name {
+            display: block;
+        }
+
+        .dropzone.has-file .drop-text-main {
+            display: none;
+        }
+
+        .dropzone.has-file .drop-text-sub {
+            display: none;
+        }
+
+        /* Format selector */
+        .field-label {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+
+        .format-btn {
+            padding: 10px 0;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 2px;
+            text-transform: uppercase;
+            transition: all 0.15s;
+        }
+
+            .format-btn:hover {
+                border-color: var(--border-lit);
+                color: var(--text);
+            }
+
+            .format-btn.selected {
+                border-color: var(--accent);
+                color: var(--accent);
+                background: rgba(232, 255, 71, 0.08);
+                box-shadow: 0 0 12px rgba(232, 255, 71, 0.1);
+            }
+
+        /* Submit button */
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: #0a0a0a;
+            border: none;
+            font-family: var(--display);
+            font-size: 22px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .submit-btn:hover:not(:disabled) {
+                background: #f5ff6e;
+                box-shadow: 0 0 24px rgba(232, 255, 71, 0.3);
+            }
+
+            .submit-btn:active:not(:disabled) {
+                transform: scale(0.99);
+            }
+
+            .submit-btn:disabled {
+                background: var(--border-lit);
+                color: var(--text-muted);
+                cursor: not-allowed;
+            }
+
+        /* Status panel */
+        .status-panel {
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+            animation: fadeSlideIn 0.3s ease;
+        }
+
+            .status-panel.visible {
+                display: block;
+            }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+
+            .status-indicator.queued {
+                background: var(--text-muted);
+            }
+
+            .status-indicator.processing {
+                background: var(--accent);
+                animation: pulse 1s ease-in-out infinite;
+            }
+
+            .status-indicator.done {
+                background: var(--green);
+            }
+
+            .status-indicator.error {
+                background: var(--red);
+            }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(232,255,71,0.4);
+            }
+
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 0 4px rgba(232,255,71,0);
+            }
+        }
+
+        .status-label {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .status-id {
+            margin-left: auto;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .status-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* Progress bar */
+        .progress-track {
+            height: 2px;
+            background: var(--border);
+            border-radius: 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.4s ease;
+            box-shadow: 0 0 8px rgba(232, 255, 71, 0.5);
+        }
+
+            .progress-fill.indeterminate {
+                width: 40%;
+                animation: indeterminate 1.4s ease-in-out infinite;
+            }
+
+        @keyframes indeterminate {
+            0% {
+                margin-left: -40%;
+            }
+
+            100% {
+                margin-left: 100%;
+            }
+        }
+
+        /* Log */
+        .log {
+            background: #080808;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 14px 16px;
+            max-height: 160px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+            .log::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            .log::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            .log::-webkit-scrollbar-thumb {
+                background: var(--border-lit);
+            }
+
+        .log-entry {
+            font-family: var(--mono);
+            font-size: 11px;
+            display: flex;
+            gap: 10px;
+            line-height: 1.6;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .log-msg {
+            color: var(--text-dim);
+        }
+
+            .log-msg.accent {
+                color: var(--accent);
+            }
+
+            .log-msg.success {
+                color: var(--green);
+            }
+
+            .log-msg.error {
+                color: var(--red);
+            }
+
+        /* Download button */
+        .download-btn {
+            display: none;
+            width: 100%;
+            padding: 13px;
+            background: transparent;
+            color: var(--green);
+            border: 1px solid var(--green);
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 2px;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+
+            .download-btn.visible {
+                display: block;
+                animation: fadeSlideIn 0.3s ease;
+            }
+
+            .download-btn:hover {
+                background: rgba(71, 255, 138, 0.08);
+                box-shadow: 0 0 16px rgba(71, 255, 138, 0.15);
+            }
+
+        /* Reset button */
+        .reset-btn {
+            display: none;
+            background: transparent;
+            border: none;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            padding: 0;
+            transition: color 0.15s;
+            align-self: center;
+            margin-top: 4px;
+        }
+
+            .reset-btn.visible {
+                display: block;
+            }
+
+            .reset-btn:hover {
+                color: var(--text);
+            }
+
+        /* Footer */
+        footer {
+            margin-top: 32px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-  <h2>Parallel File Upload Test</h2>
+    <div class="page">
+        <div class="content">
+            <header>
+                <div class="logo">TRANSMUTE</div>
+                <div class="tagline">// Image Format Converter</div>
+            </header>
 
-  <input type="file" id="fileInput" accept="image/jpeg" />
-  <button id="sendBtn">Send 10 Requests</button>
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-header-dot"></div>
+                    <span class="card-title">New Conversion Job</span>
+                </div>
+                <div class="card-body">
 
-  <pre id="log"></pre>
+                    <!-- Drop zone -->
+                    <div>
+                        <span class="field-label">01 — Source File</span>
+                        <div class="dropzone" id="dropzone">
+                            <input type="file" id="fileInput" accept="image/*" />
+                            <div class="drop-icon">
+                                <!-- ...svg... -->
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                                </svg>
+                            </div>
+                            <span class="drop-text-main">Drop image here or click to browse</span>
+                            <span class="drop-text-sub">PNG · JPG · WEBP · GIF · BMP · TIFF</span>
+                            <span class="file-name" id="fileName"></span>
+                        </div>
+                    </div>
 
-  <script>
-    const url = "http://localhost:5000/api/convert?from=jpeg&to=png";
-    const logEl = document.getElementById("log");
+                    <!-- Format selector -->
+                    <div>
+                        <span class="field-label">02 — Target Format</span>
+                        <div class="format-grid" id="formatGrid">
+                            <button class="format-btn selected" data-format="png">PNG</button>
+                            <button class="format-btn" data-format="jpg">JPG</button>
+                            <button class="format-btn" data-format="webp">WEBP</button>
+                            <button class="format-btn" data-format="gif">GIF</button>
+                            <button class="format-btn" data-format="bmp">BMP</button>
+                            <button class="format-btn" data-format="tiff">TIFF</button>
+                            <button class="format-btn" data-format="avif">AVIF</button>
+                            <button class="format-btn" data-format="ico">ICO</button>
+                            <button class="format-btn" data-format="svg">SVG</button>
+                            <button class="format-btn" data-format="pdf">PDF</button>
+                        </div>
+                    </div>
 
-    function log(msg) {
-      logEl.textContent += msg + "\n";
+                    <!-- Job count selector -->
+                    <div>
+                        <span class="field-label">03 — Number of Jobs</span>
+                        <input type="number" id="jobCount" min="1" max="30" value="1" style="width:60px; font-size:14px; padding:4px; border-radius:2px; border:1px solid var(--border); background:var(--surface); color:var(--text);">
+                    </div>
+
+                    <!-- Submit -->
+                    <button class="submit-btn" id="submitBtn" disabled>CONVERT</button>
+
+                    <!-- Reset -->
+                    <button class="reset-btn" id="resetBtn">← Start new conversion</button>
+                </div>
+            </div>
+
+            <!-- Status panel -->
+            <div class="status-panel" id="statusPanel">
+                <div class="status-header">
+                    <div class="status-indicator queued" id="statusIndicator"></div>
+                    <span class="status-label" id="statusLabel">Queued</span>
+                    <span class="status-id" id="statusId"></span>
+                </div>
+                <div class="status-body">
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="log" id="log"></div>
+                    <a href="#" class="download-btn" id="downloadBtn" download>↓ Download Result</a>
+                </div>
+            </div>
+
+            <!-- Bulk status panels -->
+            <div id="bulkStatusPanels"></div>
+
+            <!-- Bulk status panel (summary) -->
+            <div class="status-panel" id="bulkStatusPanel" style="display:none;">
+                <div class="status-header">
+                    <div class="status-indicator queued" id="bulkStatusIndicator"></div>
+                    <span class="status-label" id="bulkStatusLabel">Queued</span>
+                    <span class="status-id"></span>
+                </div>
+                <div class="status-body">
+                    <div class="progress-track">
+                        <div class="progress-fill indeterminate" id="bulkProgressFill"></div>
+                    </div>
+                    <div id="bulkStatusSummary" style="font-size:12px;color:var(--text-muted);text-align:center;margin:4px 0;">
+                        <!-- Summary text -->
+                    </div>
+                    <table id="bulkStatusTable" style="width:100%; border-collapse:collapse; font-size:12px;">
+                        <thead>
+                            <tr>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">#</th>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Job ID</th>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Status</th>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Progress</th>
+                                <th style="padding:4px 8px; border-bottom:1px solid var(--border);">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Job rows will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <footer>TRANSMUTE v1.0 &nbsp;·&nbsp; QUEUE-BASED PROCESSING</footer>
+        </div>
+    </div>
+
+    <script>
+  // ─── Config ───────────────────────────────────────────────────────────────
+  const BASE = 'http://localhost:8512';
+  const API = {
+    submit:  (fmt) => `${BASE}/api/Convert?to=${encodeURIComponent(fmt)}`,
+    status:  (id)  => `${BASE}/api/Convert/${id}`,
+    result:  (id)  => `${BASE}/api/Convert/${id}/result`,
+    batchSubmit: () => `${BASE}/api/Convert/batch`,
+    batchStatus: () => `${BASE}/api/Convert/batch/status`,
+    batchResults: () => `${BASE}/api/Convert/batch/results`,
+  };
+  const POLL_INTERVAL = 2000;
+  const MAX_POLLS = 60;
+
+  // ─── State ────────────────────────────────────────────────────────────────
+  let selectedFile = null;
+  let selectedFormat = 'png';
+
+  // ─── Elements ─────────────────────────────────────────────────────────────
+  const dropzone    = document.getElementById('dropzone');
+  const fileInput   = document.getElementById('fileInput');
+  const fileName    = document.getElementById('fileName');
+  const formatGrid  = document.getElementById('formatGrid');
+  const submitBtn   = document.getElementById('submitBtn');
+  const resetBtn    = document.getElementById('resetBtn');
+  const jobCountInput = document.getElementById('jobCount');
+  const bulkStatusPanels = document.getElementById('bulkStatusPanels');
+  const bulkStatusPanel = document.getElementById('bulkStatusPanel');
+  const bulkStatusIndicator = document.getElementById('bulkStatusIndicator');
+  const bulkStatusLabel = document.getElementById('bulkStatusLabel');
+  const bulkStatusSummary = document.getElementById('bulkStatusSummary');
+  const bulkProgressFill = document.getElementById('bulkProgressFill');
+  const bulkStatusTable = document.getElementById('bulkStatusTable');
+
+  // ─── File handling ────────────────────────────────────────────────────────
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) setFile(e.target.files[0]);
+  });
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('dragover');
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) setFile(file);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileName.textContent = file.name;
+    dropzone.classList.add('has-file');
+    updateSubmitState();
+  }
+
+  // ─── Format selection ─────────────────────────────────────────────────────
+  formatGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.format-btn');
+    if (!btn) return;
+    document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedFormat = btn.dataset.format;
+    updateSubmitState();
+  });
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
+  function updateSubmitState() {
+    submitBtn.disabled = !selectedFile;
+  }
+
+  submitBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    const jobCount = Math.max(1, Math.min(30, parseInt(jobCountInput.value, 10) || 1));
+    await submitBulkJobs(jobCount);
+  });
+
+  async function submitBulkJobs(jobCount) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = `QUEUING ${jobCount}…`;
+    resetBtn.classList.remove('visible');
+    bulkStatusPanel.style.display = 'block';
+    bulkStatusIndicator.className = 'status-indicator queued';
+    bulkStatusLabel.textContent = 'Queued';
+    bulkStatusSummary.textContent = '';
+    bulkProgressFill.classList.add('indeterminate');
+    bulkProgressFill.style.width = '';
+    bulkStatusTable.innerHTML = '';
+
+    // Prepare FormData for batch
+    const fd = new FormData();
+    for (let i = 0; i < jobCount; i++) {
+      fd.append('Files', selectedFile, selectedFile.name); // API expects 'Files'
     }
+    fd.append('TargetFormat', selectedFormat);
 
-    async function sendRequest(i, file) {
-      const form = new FormData();
-      form.append("file", file);
+    // State for all jobs
+    const jobs = [];
+    for (let i = 0; i < jobCount; i++) {
+      jobs.push({
+        index: i + 1,
+        jobId: null,
+        status: 'Queued',
+        progress: null,
+        error: null,
+        done: false,
+        downloadUrl: null,
+        pollCount: 0,
+        pollTimer: null,
+      });
+    }
+    updateBulkTable(jobs);
 
-      log(`Starting request ${i}...`);
+    // Submit all jobs in one batch
+    let jobIds = [];
+    try {
+      const res = await fetch(API.batchSubmit(), {
+        method: 'POST',
+        body: fd
+      });
+      const envelope = await res.json();
+      if (!envelope.success) throw new Error(envelope.error?.message || 'Batch submission failed');
+      jobIds = envelope.data?.jobs?.map(j => j.jobId) || [];
+      if (jobIds.length !== jobCount) throw new Error('Batch API did not return expected number of jobs');
+      jobs.forEach((job, i) => { job.jobId = jobIds[i]; job.status = 'Processing'; });
+    } catch (err) {
+      jobs.forEach(job => { job.error = err; job.done = true; });
+      updateBulkTable(jobs);
+      submitBtn.textContent = 'CONVERT';
+      resetBtn.classList.add('visible');
+      return;
+    }
+    updateBulkTable(jobs);
 
+    // Poll all jobs in batch
+    pollBulkStatus(jobs, jobIds);
+    submitBtn.textContent = 'CONVERT';
+    resetBtn.classList.add('visible');
+  }
+
+  async function pollBulkStatus(jobs, jobIds) {
+    let pollCount = 0;
+    let completed = 0;
+    let errored = 0;
+    while (completed + errored < jobs.length && pollCount < MAX_POLLS) {
+      pollCount++;
       try {
-        const response = await fetch(url, {
-          method: "POST",
-          body: form
+        const res = await fetch(API.batchStatus(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobIds })
         });
-
-        log(`Request ${i} completed with status: ${response.status}`);
+        const envelope = await res.json();
+        if (!envelope.success) throw new Error(envelope.error?.message || 'Batch status failed');
+        const statuses = envelope.data?.statuses || [];
+        completed = 0;
+        errored = 0;
+        statuses.forEach((item, i) => {
+          const status = (item.status || '').toLowerCase();
+          if (['done', 'complete', 'completed', 'finished', 'succeeded', 'success'].includes(status)) {
+            jobs[i].status = 'Done';
+            jobs[i].progress = 100;
+            jobs[i].done = true;
+            completed++;
+          } else if (['error', 'failed', 'failure', 'faulted', 'cancelled', 'canceled', 'notfound'].includes(status)) {
+            jobs[i].status = status;
+            jobs[i].error = new Error(item.error || `Job ${status}`);
+            jobs[i].done = true;
+            errored++;
+          } else {
+            jobs[i].status = item.status || status;
+            jobs[i].progress = null;
+            jobs[i].done = false;
+          }
+        });
+        updateBulkTable(jobs);
+        if (completed + errored === jobs.length) break;
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
       } catch (err) {
-        log(`Request ${i} failed: ${err}`);
-      }
-    }
-
-    document.getElementById("sendBtn").onclick = async () => {
-      const fileInput = document.getElementById("fileInput");
-      const file = fileInput.files[0];
-
-      if (!file) {
-        alert("Please select a JPEG file first.");
+        jobs.forEach(job => { if (!job.done) { job.error = err; job.done = true; } });
+        updateBulkTable(jobs);
         return;
       }
+    }
+    // Get download URLs for completed jobs
+    const readyJobIds = jobs.filter(j => j.done && !j.error).map(j => j.jobId);
+    if (readyJobIds.length > 0) {
+      try {
+        const res = await fetch(API.batchResults(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobIds: readyJobIds })
+        });
+        const envelope = await res.json();
+        if (envelope.success && envelope.data?.results) {
+          envelope.data.results.forEach(result => {
+            const job = jobs.find(j => j.jobId === result.jobId);
+            if (job && result.status === 'Complete' && result.downloadUrl) {
+              job.downloadUrl = result.downloadUrl;
+            } else if (job && result.error) {
+              job.error = new Error(result.error);
+            }
+          });
+        }
+      } catch {}
+      updateBulkTable(jobs);
+    }
+  }
 
-      log("Sending 10 parallel requests...\n");
+  function toAbsoluteUrl(url) {
+      if (!url) return url;
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      if (url.startsWith('/')) return BASE + url;
+      return url;
+    }
 
-      const tasks = [];
-      for (let i = 1; i <= 10; i++) {
-        tasks.push(sendRequest(i, file));
+    function updateBulkTable(jobs) {
+      bulkStatusTable.innerHTML = '';
+      let completed = 0, errored = 0, total = jobs.length;
+      let totalProgress = 0, progressCount = 0;
+      jobs.forEach(job => {
+        if (job.done) completed++;
+        if (job.error) errored++;
+        if (typeof job.progress === 'number') {
+          totalProgress += job.progress;
+          progressCount++;
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding:4px 8px;">${job.index}</td>
+          <td style="padding:4px 8px;">${job.jobId ? job.jobId : '<span style=\"color:var(--text-muted);\">—</span>'}</td>
+          <td style="padding:4px 8px;">
+            <span style="color:${job.error ? 'var(--red)' : (job.done ? 'var(--green)' : 'var(--text-dim)')};">
+              ${job.error ? 'Error' : (job.done ? 'Done' : job.status)}
+            </span>
+          </td>
+          <td style="padding:4px 8px;">
+            <div class="progress-track" style="height:6px;">
+              <div class="progress-fill${job.progress === null ? ' indeterminate' : ''}" style="height:100%;width:${job.progress === null ? '40%' : Math.min(100, Math.max(0, job.progress)) + '%'};"></div>
+            </div>
+          </td>
+          <td style="padding:4px 8px;">
+            ${job.error ? `<span style="color:var(--red);font-size:12px;">${escapeHtml(job.error.message)}</span>` :
+              (job.done && job.downloadUrl ? `<a href="${toAbsoluteUrl(job.downloadUrl)}" download style="color:var(--green);text-decoration:none;">Download</a>` : '')}
+          </td>
+        `;
+        bulkStatusTable.appendChild(tr);
+      });
+      // Update summary/progress
+      bulkStatusSummary.textContent = `${completed}/${total} complete${errored ? `, ${errored} error${errored > 1 ? 's' : ''}` : ''}`;
+      if (completed === total) {
+        bulkStatusIndicator.className = errored ? 'status-indicator error' : 'status-indicator done';
+        bulkStatusLabel.textContent = errored ? 'Completed with errors' : 'Complete';
+        bulkProgressFill.classList.remove('indeterminate');
+        bulkProgressFill.style.width = '100%';
+      } else {
+        bulkStatusIndicator.className = 'status-indicator processing';
+        bulkStatusLabel.textContent = 'Processing';
+        if (progressCount > 0) {
+          bulkProgressFill.classList.remove('indeterminate');
+          bulkProgressFill.style.width = `${(totalProgress / total).toFixed(1)}%`;
+        } else {
+          bulkProgressFill.classList.add('indeterminate');
+          bulkProgressFill.style.width = '';
+        }
       }
+    }
 
-      await Promise.all(tasks);
+  // Reset logic (update to hide bulk panel)
+  resetBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    dropzone.classList.remove('has-file');
+    fileName.textContent = '';
+    bulkStatusPanel.style.display = 'none';
+    submitBtn.textContent = 'CONVERT';
+    submitBtn.disabled = true;
+    resetBtn.classList.remove('visible');
+  });
 
-      log("\nAll requests finished.");
-    };
-  </script>
+  // Helper
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+    </script>
 </body>
 </html>

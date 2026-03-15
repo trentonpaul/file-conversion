@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     ports:
-      - 5000:8080
+      - 8512:8080
     environment:
       - ASPNETCORE_URLS=http://+:8080
       - RabbitMq__HostName=rabbitmq
@@ -32,7 +32,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["dotnet", "FileConversionApi.dll", "--migrate-only"]
+    command: ["dotnet", "FileConversion.Api.dll", "--migrate-only"]
     restart: "no"
   worker:
     container_name: fileconversion_worker
@@ -53,7 +53,7 @@ services:
     volumes:
       - shared-storage:/app/storage
   rabbitmq:
-    image: rabbitmq:latest
+    image: rabbitmq:4-management
     container_name: fileconversion_rabbitmq
     restart: always
     ports:
@@ -74,7 +74,7 @@ services:
       - rabbitmq-lib:/var/lib/rabbitmq/
       - rabbitmq-log:/var/log/rabbitmq
   db:
-    image: postgres:latest
+    image: postgres:16
     container_name: fileconversion_db
     restart: always
     environment:

@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-scaledobject
+  namespace: fileconversion
+spec:
+  scaleTargetRef:
+    name: worker
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 5
+  cooldownPeriod: 30
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: conversion-jobs
+        mode: QueueLength
+        value: "5"
+      authenticationRef:
+        name: keda-rabbitmq-auth
